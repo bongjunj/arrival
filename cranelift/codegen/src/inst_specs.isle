@@ -1383,6 +1383,7 @@
 (attr select_spectre_guard (tag spectre))
 
 ; Use Z3 solver for the following instructions.
+(attr imul (tag solver_z3))
 (attr fadd (tag solver_z3))
 (attr fmul (tag solver_z3))
 (attr fdiv (tag solver_z3))
