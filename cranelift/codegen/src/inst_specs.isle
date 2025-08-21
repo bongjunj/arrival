@@ -1385,6 +1385,7 @@
 ; Use Z3 solver for the following instructions.
 (attr imul (tag solver_z3))
 (attr fadd (tag solver_z3))
+(attr fsub (tag solver_z3))
 (attr fmul (tag solver_z3))
 (attr fdiv (tag solver_z3))
 (attr sqrt (tag solver_z3))
@@ -1392,4 +1393,3 @@
 (attr cls (tag solver_z3))
 (attr clz (tag solver_z3))
 (attr ctz (tag solver_z3))
-(attr popcnt (tag solver_z3))
