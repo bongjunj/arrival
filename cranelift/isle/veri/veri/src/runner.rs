@@ -227,6 +227,7 @@ impl FromStr for SolverRule {
 #[derive(Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Verdict {
+    Failure,
     Inapplicable,
     Success,
     Unknown,
@@ -782,7 +783,14 @@ impl Runner {
                     verify_time: None,
                 })
             }
-            Applicability::Unknown => bail!("could not prove applicability"),
+            Applicability::Unknown => {
+                return Ok(VerifyReport {
+                    verdict: Verdict::Unknown,
+                    init_time,
+                    applicable_time,
+                    verify_time: None,
+                })
+            }
         };
 
         // Verify.
@@ -795,7 +803,12 @@ impl Runner {
             Verification::Failure(model) => {
                 println!("model:");
                 conditions.print_model(&model, &self.prog)?;
-                bail!("verification failed");
+                VerifyReport {
+                    verdict: Verdict::Failure,
+                    init_time,
+                    applicable_time,
+                    verify_time,
+                }
             }
             Verification::Success => VerifyReport {
                 verdict: Verdict::Success,
