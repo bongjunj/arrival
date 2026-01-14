@@ -798,7 +798,13 @@ impl SpecEnv {
         // Collect instantiations.
         for def in defs {
             if let ast::Def::Instantiation(inst) = def {
-                let term_id = termenv.get_term_by_name(tyenv, &inst.term).unwrap();
+                let term_id = match termenv.get_term_by_name(tyenv, &inst.term) {
+                    Some(term_id) => term_id,
+                    None => {
+                        log::warn!("skipping instantiation for unknown term '{}'", inst.term.0);
+                        continue;
+                    }
+                };
                 let sigs = match &inst.form {
                     Some(form) => form_signature[&form.0].clone(),
                     None => inst.signatures.iter().map(Signature::from_ast).collect(),
@@ -811,12 +817,13 @@ impl SpecEnv {
     fn collect_specs(&mut self, defs: &[Def], termenv: &TermEnv, tyenv: &TypeEnv) -> Result<()> {
         for def in defs {
             if let ast::Def::Spec(spec) = def {
-                let term_id = termenv
-                    .get_term_by_name(tyenv, &spec.term)
-                    .ok_or(format_err!(
-                        "spec for unknown term {name}",
-                        name = spec.term.0
-                    ))?;
+                let term_id = match termenv.get_term_by_name(tyenv, &spec.term) {
+                    Some(id) => id,
+                    None => {
+                        log::warn!("skipping spec for unknown term '{}'", spec.term.0);
+                        continue;
+                    }
+                };
                 match self.term_spec.entry(term_id) {
                     Entry::Occupied(_) => {
                         bail!("duplicate spec for term {name}", name = spec.term.0)
@@ -835,10 +842,13 @@ impl SpecEnv {
             if let ast::Def::Attr(attr) = def {
                 match &attr.target {
                     AttrTarget::Term(name) => {
-                        let term_id = termenv.get_term_by_name(tyenv, name).ok_or(format_err!(
-                            "attr term '{name}' should exist",
-                            name = name.0
-                        ))?;
+                        let term_id = match termenv.get_term_by_name(tyenv, name) {
+                            Some(id) => id,
+                            None => {
+                                log::warn!("skipping attr for unknown term '{}'", name.0);
+                                continue;
+                            }
+                        };
                         for kind in &attr.kinds {
                             match kind {
                                 AttrKind::Chain => {
