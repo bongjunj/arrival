@@ -487,7 +487,7 @@ impl<L: Length, C> Length for ContextIterWrapper<L, C> {{
         }
     }
 
-    fn validate_block(ret_kind: ReturnKind, block: &Block) -> Nested {
+    fn validate_block(ret_kind: ReturnKind, block: &'_ Block) -> Nested<'_> {
         if !matches!(ret_kind, ReturnKind::Iterator) {
             // Loops are only allowed if we're returning an iterator.
             assert!(!block

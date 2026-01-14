@@ -550,7 +550,7 @@ impl<'a> Expander<'a> {
         self.complete.push(expansion);
     }
 
-    pub fn chaining(&self) -> &Chaining {
+    pub fn chaining(&'_ self) -> &'_ Chaining<'_> {
         &self.chaining
     }
 
