@@ -48,6 +48,13 @@ impl BindingId {
 /// such as constants or function calls; but it also includes names bound in pattern matches.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Binding {
+    /// Evaluates to the given boolean literal.
+    ConstBool {
+        /// The constant value.
+        val: bool,
+        /// The constant's type.
+        ty: sema::TypeId,
+    },
     /// Evaluates to the given integer literal.
     ConstInt {
         /// The constant value.
@@ -148,6 +155,13 @@ pub enum Constraint {
         /// Number of fields in this variant of this enum. This is recorded in the constraint for
         /// convenience, to avoid needing to look up the variant in a [sema::TypeEnv].
         fields: TupleIndex,
+    },
+    /// The value must equal this boolean literal.
+    ConstBool {
+        /// The constant value.
+        val: bool,
+        /// The constant's type.
+        ty: sema::TypeId,
     },
     /// The value must equal this integer literal.
     ConstInt {
@@ -251,6 +265,7 @@ impl Binding {
     /// Returns the binding sites which must be evaluated before this binding.
     pub fn sources(&self) -> &[BindingId] {
         match self {
+            Binding::ConstBool { .. } => &[][..],
             Binding::ConstInt { .. } => &[][..],
             Binding::ConstPrim { .. } => &[][..],
             Binding::Argument { .. } => &[][..],
@@ -269,6 +284,7 @@ impl Binding {
     // QUESTION(mbm): does Binding::term method make sense here?
     pub fn term(&self, tyenv: &TypeEnv, termenv: &TermEnv) -> Option<TermId> {
         match self {
+            Binding::ConstBool { .. } => None,
             Binding::ConstInt { .. } => None,
             Binding::ConstPrim { .. } => None,
             Binding::Argument { .. } => None,
@@ -292,7 +308,9 @@ impl Constraint {
     pub fn bindings_for(self, source: BindingId) -> Vec<Binding> {
         match self {
             // These constraints never introduce any bindings.
-            Constraint::ConstInt { .. } | Constraint::ConstPrim { .. } => vec![],
+            Constraint::ConstBool { .. }
+            | Constraint::ConstInt { .. }
+            | Constraint::ConstPrim { .. } => vec![],
             Constraint::Some => vec![Binding::MatchSome { source }],
             Constraint::Variant {
                 variant, fields, ..
@@ -322,6 +340,10 @@ impl Constraint {
                     ..
                 },
             ) => tb == tc && vb == vc,
+            (
+                Constraint::ConstBool { val: vc, ty: tc },
+                Binding::ConstBool { val: vb, ty: tb },
+            ) => vc == vb && tc == tb,
             (Constraint::ConstInt { val: vc, ty: tc }, Binding::ConstInt { val: vb, ty: tb }) => {
                 vc == vb && tc == tb
             }
@@ -574,6 +596,11 @@ impl sema::PatternVisitor for RuleSetBuilder {
         }
     }
 
+    fn add_match_bool(&mut self, input: BindingId, ty: sema::TypeId, val: bool) {
+        let bindings = self.set_constraint(input, Constraint::ConstBool { val, ty });
+        debug_assert_eq!(bindings, &[]);
+    }
+
     fn add_match_int(&mut self, input: BindingId, ty: sema::TypeId, val: i128) {
         let bindings = self.set_constraint(input, Constraint::ConstInt { val, ty });
         debug_assert_eq!(bindings, &[]);
@@ -642,6 +669,10 @@ impl sema::PatternVisitor for RuleSetBuilder {
 
 impl sema::ExprVisitor for RuleSetBuilder {
     type ExprId = BindingId;
+
+    fn add_const_bool(&mut self, ty: sema::TypeId, val: bool) -> BindingId {
+        self.dedup_binding(Binding::ConstBool { val, ty })
+    }
 
     fn add_const_int(&mut self, ty: sema::TypeId, val: i128) -> BindingId {
         self.dedup_binding(Binding::ConstInt { val, ty })

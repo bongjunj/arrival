@@ -503,6 +503,7 @@ impl Printable for Pattern {
                 Doc::space(),
             ),
             Pattern::ConstInt { val, .. } => RcDoc::as_string(val),
+            Pattern::ConstBool { val, .. } => RcDoc::text(if *val { "true" } else { "false" }),
             Pattern::ConstPrim { val, .. } => RcDoc::text("$").append(val.to_doc()),
             Pattern::Wildcard { .. } => RcDoc::text("_"),
             Pattern::Term { sym, args, .. } => sexp(
@@ -543,6 +544,7 @@ impl Printable for Expr {
             ),
             Expr::Var { name, .. } => name.to_doc(),
             Expr::ConstInt { val, .. } => RcDoc::as_string(val),
+            Expr::ConstBool { val, .. } => RcDoc::text(if *val { "true" } else { "false" }),
             Expr::ConstPrim { val, .. } => RcDoc::text("$").append(val.to_doc()),
             Expr::Let { defs, body, .. } => {
                 let mut parts = Vec::new();

@@ -557,6 +557,9 @@ pub enum Pattern {
     /// type.
     Var(TypeId, VarId),
 
+    /// Match the current value against a constant boolean.
+    ConstBool(TypeId, bool),
+
     /// Match the current value against a constant integer of the given integer
     /// type.
     ConstInt(TypeId, i128),
@@ -583,6 +586,8 @@ pub enum Expr {
     Term(TypeId, TermId, Vec<Expr>),
     /// Get the value of a variable that was bound in the left-hand side.
     Var(TypeId, VarId),
+    /// Get a constant boolean.
+    ConstBool(TypeId, bool),
     /// Get a constant integer.
     ConstInt(TypeId, i128),
     /// Get a constant primitive.
@@ -607,6 +612,8 @@ pub trait PatternVisitor {
 
     /// Match if `a` and `b` have equal values.
     fn add_match_equal(&mut self, a: Self::PatternId, b: Self::PatternId, ty: TypeId);
+    /// Match if `input` is the given boolean constant.
+    fn add_match_bool(&mut self, input: Self::PatternId, ty: TypeId, bool_val: bool);
     /// Match if `input` is the given integer constant.
     fn add_match_int(&mut self, input: Self::PatternId, ty: TypeId, int_val: i128);
     /// Match if `input` is the given primitive constant.
@@ -642,6 +649,7 @@ impl Pattern {
         match *self {
             Self::BindPattern(t, ..) => t,
             Self::Var(t, ..) => t,
+            Self::ConstBool(t, ..) => t,
             Self::ConstInt(t, ..) => t,
             Self::ConstPrim(t, ..) => t,
             Self::Term(t, ..) => t,
@@ -673,6 +681,7 @@ impl Pattern {
                     .expect("Variable should already be bound");
                 visitor.add_match_equal(input, var_val, ty);
             }
+            Pattern::ConstBool(ty, value) => visitor.add_match_bool(input, ty, value),
             Pattern::ConstInt(ty, value) => visitor.add_match_int(input, ty, value),
             Pattern::ConstPrim(ty, value) => visitor.add_match_prim(input, ty, value),
             Pattern::Term(ty, term, ref args) => {
@@ -737,6 +746,8 @@ pub trait ExprVisitor {
     /// The type of subexpression identifiers.
     type ExprId: Copy;
 
+    /// Construct a constant boolean.
+    fn add_const_bool(&mut self, ty: TypeId, val: bool) -> Self::ExprId;
     /// Construct a constant integer.
     fn add_const_int(&mut self, ty: TypeId, val: i128) -> Self::ExprId;
     /// Construct a primitive constant.
@@ -768,6 +779,7 @@ impl Expr {
         match *self {
             Self::Term(t, ..) => t,
             Self::Var(t, ..) => t,
+            Self::ConstBool(t, ..) => t,
             Self::ConstInt(t, ..) => t,
             Self::ConstPrim(t, ..) => t,
             Self::Let { ty: t, .. } => t,
@@ -783,6 +795,7 @@ impl Expr {
     ) -> V::ExprId {
         log!("Expr::visit: expr {:?}", self);
         match *self {
+            Expr::ConstBool(ty, val) => visitor.add_const_bool(ty, val),
             Expr::ConstInt(ty, val) => visitor.add_const_int(ty, val),
             Expr::ConstPrim(ty, val) => visitor.add_const_prim(ty, val),
             Expr::Let {
@@ -1974,6 +1987,18 @@ impl TermEnv {
                 }
                 Some(Pattern::ConstInt(expected_ty, val))
             }
+            &ast::Pattern::ConstBool { val, pos } => {
+                let expected_name = tyenv.types[expected_ty.index()].name(tyenv);
+                if expected_name != "bool" {
+                    tyenv.report_error(
+                        pos,
+                        format!(
+                            "Boolean literal '{val}' has type bool but we need {expected_name} in context",
+                        ),
+                    );
+                }
+                Some(Pattern::ConstBool(expected_ty, val))
+            }
             &ast::Pattern::ConstPrim { ref val, pos } => {
                 let val = tyenv.intern_mut(val);
                 let const_ty = match tyenv.const_types.get(&val) {
@@ -2381,6 +2406,26 @@ impl TermEnv {
                     );
                 }
                 Some(Expr::ConstInt(ty, val))
+            }
+            &ast::Expr::ConstBool { val, pos } => {
+                if ty.is_none() {
+                    tyenv.report_error(
+                        pos,
+                        "boolean literal in a context that needs an explicit type".to_string(),
+                    );
+                    return None;
+                }
+                let ty = ty.unwrap();
+                let expected_name = tyenv.types[ty.index()].name(tyenv);
+                if expected_name != "bool" {
+                    tyenv.report_error(
+                        pos,
+                        format!(
+                            "Boolean literal '{val}' has type bool but we need {expected_name} in context",
+                        ),
+                    );
+                }
+                Some(Expr::ConstBool(ty, val))
             }
             &ast::Expr::ConstPrim { ref val, pos } => {
                 let val = tyenv.intern_mut(val);

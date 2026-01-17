@@ -6,7 +6,7 @@ use cranelift_isle::{
     lexer::Pos,
     sema::{self, Sym, TypeEnv, TypeId, VariantId},
 };
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 
 /// Width of a bit vector.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -378,6 +378,19 @@ impl Const {
             Const::Int(v) => Some(*v),
             _ => None,
         }
+    }
+
+    fn signed_to_bv(val: i128, bits: usize) -> Result<BigUint> {
+        let modulus = BigInt::from(1u8) << bits;
+        let v = BigInt::from(val);
+        let wrapped = ((v % &modulus) + &modulus) % &modulus;
+        Ok(wrapped
+            .to_biguint()
+            .expect("modulus is positive, so remainder is non-negative"))
+    }
+
+    pub fn bv_from_signed(val: i128, width: usize) -> Result<Self> {
+        Ok(Const::BitVector(width, Self::signed_to_bv(val, width)?))
     }
 }
 

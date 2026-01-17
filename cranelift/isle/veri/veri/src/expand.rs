@@ -820,9 +820,10 @@ impl Reindex {
 
     fn binding(&self, binding: &Binding) -> Binding {
         match binding {
-            Binding::Argument { .. } | Binding::ConstInt { .. } | Binding::ConstPrim { .. } => {
-                binding.clone()
-            }
+            Binding::Argument { .. }
+            | Binding::ConstBool { .. }
+            | Binding::ConstInt { .. }
+            | Binding::ConstPrim { .. } => binding.clone(),
 
             Binding::Extractor { term, parameter } => Binding::Extractor {
                 term: *term,

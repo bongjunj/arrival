@@ -1068,6 +1068,10 @@ impl<'a> Parser<'a> {
             Ok(Pattern::ConstPrim { val, pos })
         } else if self.eat_sym_str("_")? {
             Ok(Pattern::Wildcard { pos })
+        } else if self.eat_sym_str("true")? {
+            Ok(Pattern::ConstBool { val: true, pos })
+        } else if self.eat_sym_str("false")? {
+            Ok(Pattern::ConstBool { val: false, pos })
         } else if self.is_sym() {
             let var = self.parse_ident()?;
             if self.is_at() {
@@ -1148,6 +1152,10 @@ impl<'a> Parser<'a> {
             Ok(Expr::ConstInt { val: 1, pos })
         } else if self.eat_sym_str("#f")? {
             Ok(Expr::ConstInt { val: 0, pos })
+        } else if self.eat_sym_str("true")? {
+            Ok(Expr::ConstBool { val: true, pos })
+        } else if self.eat_sym_str("false")? {
+            Ok(Expr::ConstBool { val: false, pos })
         } else if self.is_const() {
             let val = self.parse_const()?;
             Ok(Expr::ConstPrim { val, pos })

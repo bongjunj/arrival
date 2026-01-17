@@ -562,6 +562,8 @@ pub enum Pattern {
     },
     /// An operator that matches a constant integer value.
     ConstInt { val: i128, pos: Pos },
+    /// An operator that matches a constant boolean value.
+    ConstBool { val: bool, pos: Pos },
     /// An operator that matches an external constant value.
     ConstPrim { val: Ident, pos: Pos },
     /// An application of a type variant or term.
@@ -605,6 +607,7 @@ impl Pattern {
             }
             Pattern::Var { .. }
             | Pattern::ConstInt { .. }
+            | Pattern::ConstBool { .. }
             | Pattern::ConstPrim { .. }
             | Pattern::Wildcard { .. }
             | Pattern::MacroArg { .. } => {}
@@ -665,9 +668,10 @@ impl Pattern {
                 }
             }
 
-            &Pattern::Wildcard { .. } | &Pattern::ConstInt { .. } | &Pattern::ConstPrim { .. } => {
-                self.clone()
-            }
+            &Pattern::Wildcard { .. }
+            | &Pattern::ConstInt { .. }
+            | &Pattern::ConstBool { .. }
+            | &Pattern::ConstPrim { .. } => self.clone(),
             &Pattern::MacroArg { .. } => unreachable!(),
         }
     }
@@ -710,6 +714,7 @@ impl Pattern {
             &Pattern::Var { .. }
             | &Pattern::Wildcard { .. }
             | &Pattern::ConstInt { .. }
+            | &Pattern::ConstBool { .. }
             | &Pattern::ConstPrim { .. } => Some(self.clone()),
             &Pattern::MacroArg { index, .. } => macro_args.get(index).cloned(),
         }
@@ -718,6 +723,7 @@ impl Pattern {
     pub fn pos(&self) -> Pos {
         match self {
             &Pattern::ConstInt { pos, .. }
+            | &Pattern::ConstBool { pos, .. }
             | &Pattern::ConstPrim { pos, .. }
             | &Pattern::And { pos, .. }
             | &Pattern::Term { pos, .. }
@@ -746,6 +752,8 @@ pub enum Expr {
     Var { name: Ident, pos: Pos },
     /// A constant integer.
     ConstInt { val: i128, pos: Pos },
+    /// A constant boolean.
+    ConstBool { val: bool, pos: Pos },
     /// A constant of some other primitive type.
     ConstPrim { val: Ident, pos: Pos },
     /// The `(let ((var ty val)*) body)` form.
@@ -762,6 +770,7 @@ impl Expr {
             &Expr::Term { pos, .. }
             | &Expr::Var { pos, .. }
             | &Expr::ConstInt { pos, .. }
+            | &Expr::ConstBool { pos, .. }
             | &Expr::ConstPrim { pos, .. }
             | &Expr::Let { pos, .. } => pos,
         }
@@ -782,7 +791,10 @@ impl Expr {
                 }
                 body.terms(f);
             }
-            Expr::Var { .. } | Expr::ConstInt { .. } | Expr::ConstPrim { .. } => {}
+            Expr::Var { .. }
+            | Expr::ConstInt { .. }
+            | Expr::ConstBool { .. }
+            | Expr::ConstPrim { .. } => {}
         }
     }
 }

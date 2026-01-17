@@ -152,6 +152,10 @@ pub fn binding_string(
 ) -> String {
     match binding {
         Binding::Argument { index } => format!("argument({})", index.index()),
+        Binding::ConstBool { val, ty } => {
+            let ty = &prog.tyenv.types[ty.index()];
+            format!("const_bool({val}, {name})", name = ty.name(&prog.tyenv))
+        }
         Binding::ConstInt { val, ty } => {
             let ty = &prog.tyenv.types[ty.index()];
             format!("const_int({val}, {name})", name = ty.name(&prog.tyenv))
@@ -276,6 +280,7 @@ pub fn constraint_string(constraint: &Constraint, tyenv: &TypeEnv) -> String {
                 }
             }
         }
+        Constraint::ConstBool { val, .. } => format!("const_bool({val})"),
         Constraint::ConstInt { val, .. } => format!("const_int({val})"),
         Constraint::ConstPrim { val } => format!("const_prim({})", tyenv.syms[val.index()]),
         Constraint::Some => "some".to_string(),

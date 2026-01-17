@@ -1096,6 +1096,8 @@ impl<'a> ConditionsBuilder<'a> {
 
         // Generate conditions depending on binding type.
         match binding {
+            Binding::ConstBool { val, ty } => self.const_bool(id, *val, *ty),
+
             Binding::ConstInt { val, ty } => self.const_int(id, *val, *ty),
 
             Binding::ConstPrim { val } => self.const_prim(id, *val),
@@ -1137,6 +1139,12 @@ impl<'a> ConditionsBuilder<'a> {
         Ok(())
     }
 
+    fn const_bool(&mut self, id: BindingId, val: bool, ty: TypeId) -> Result<()> {
+        let eq = self.equals_const_bool(id, val, ty)?;
+        self.conditions.assumptions.push(eq);
+        Ok(())
+    }
+
     fn equals_const_int(&mut self, id: BindingId, val: i128, ty: TypeId) -> Result<ExprId> {
         // Determine modeled type.
         let ty_name = self.prog.type_name(ty);
@@ -1153,6 +1161,29 @@ impl<'a> ConditionsBuilder<'a> {
         let value = self.spec_typed_value(val, ty)?.into();
 
         // Destination binding equals constant value.
+        let eq = self.values_equal(self.binding_value[&id].clone(), value)?;
+        Ok(eq)
+    }
+
+    fn equals_const_bool(&mut self, id: BindingId, val: bool, ty: TypeId) -> Result<ExprId> {
+        // Determine modeled type.
+        let ty_name = self.prog.type_name(ty);
+        let ty = self
+            .prog
+            .specenv
+            .type_model
+            .get(&ty)
+            .ok_or(self.error(format!("no model for type {ty_name}")))?
+            .as_primitive()
+            .ok_or(self.error("constant must have basic type"))?;
+
+        if *ty != Type::Bool {
+            return Err(self.error(format!(
+                "boolean constant requires Bool type but model is {ty}"
+            )));
+        }
+
+        let value: Symbolic = self.boolean(val).into();
         let eq = self.values_equal(self.binding_value[&id].clone(), value)?;
         Ok(eq)
     }
@@ -1533,6 +1564,7 @@ impl<'a> ConditionsBuilder<'a> {
         match constraint {
             Constraint::Some => self.constraint_some(binding_id),
             Constraint::ConstPrim { val } => self.equals_const_prim(binding_id, *val),
+            Constraint::ConstBool { val, ty } => self.equals_const_bool(binding_id, *val, *ty),
             Constraint::ConstInt { val, ty } => self.equals_const_int(binding_id, *val, *ty),
             Constraint::Variant {
                 ty,
@@ -1788,7 +1820,7 @@ impl<'a> ConditionsBuilder<'a> {
             })),
             Type::Int => Ok(self.constant(Const::Int(val))),
             Type::BitVector(Width::Bits(w)) => {
-                Ok(self.constant(Const::BitVector(*w, val.try_into()?)))
+                Ok(self.constant(Const::bv_from_signed(val, *w)?))
             }
             _ => bail!("cannot construct constant of type {ty}"),
         }

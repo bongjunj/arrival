@@ -585,7 +585,9 @@ impl<L: Length, C> Length for ContextIterWrapper<L, C> {{
                             let arm = &arms[0];
                             let scope = ctx.enter_scope();
                             match arm.constraint {
-                                Constraint::ConstInt { .. } | Constraint::ConstPrim { .. } => {
+                                Constraint::ConstBool { .. }
+                                | Constraint::ConstInt { .. }
+                                | Constraint::ConstPrim { .. } => {
                                     write!(ctx.out, "{}if ", &ctx.indent)?;
                                     self.emit_expr(ctx, *source)?;
                                     write!(ctx.out, " == ")?;
@@ -760,6 +762,7 @@ impl<L: Length, C> Length for ContextIterWrapper<L, C> {{
             };
 
         match binding {
+            &Binding::ConstBool { val, .. } => self.emit_bool(ctx, val),
             &Binding::ConstInt { val, ty } => self.emit_int(ctx, val, ty),
             Binding::ConstPrim { val } => write!(ctx.out, "{}", &self.typeenv.syms[val.index()]),
             Binding::Argument { index } => write!(ctx.out, "arg{}", index.index()),
@@ -864,6 +867,7 @@ impl<L: Length, C> Length for ContextIterWrapper<L, C> {{
             }
         }
         match *constraint {
+            Constraint::ConstBool { val, .. } => self.emit_bool(ctx, val),
             Constraint::ConstInt { val, ty } => self.emit_int(ctx, val, ty),
             Constraint::ConstPrim { val } => {
                 write!(ctx.out, "{}", &self.typeenv.syms[val.index()])
@@ -919,6 +923,14 @@ impl<L: Length, C> Length for ContextIterWrapper<L, C> {{
                 write!(ctx.out, ")")
             }
         }
+    }
+
+    fn emit_bool<W: Write>(
+        &self,
+        ctx: &mut BodyContext<W>,
+        val: bool,
+    ) -> Result<(), std::fmt::Error> {
+        write!(ctx.out, "{val}")
     }
 
     fn emit_int<W: Write>(
