@@ -65,6 +65,13 @@ static ROUND_TOWARD_POSITIVE: &str = "roundTowardPositive";
 static ROUND_TOWARD_NEGATIVE: &str = "roundTowardNegative";
 static ROUNDING_MODE: &str = ROUND_NEAREST_TIES_TO_EVEN;
 
+fn use_z3_tactics() -> bool {
+    match std::env::var("ISLE_VERI_Z3_TACTICS") {
+        Ok(value) => value != "0",
+        Err(_) => true,
+    }
+}
+
 /// SMT Dialect.
 #[derive(Default, Debug, Clone, Copy)]
 pub enum Dialect {
@@ -167,7 +174,11 @@ impl<'a> Solver<'a> {
         self.verification_condition()?;
 
         // Check
-        let verdict = match self.check()? {
+        let verdict = match if use_z3_tactics() {
+            self.check_with_tactics()?
+        } else {
+            self.check()?
+        } {
             Response::Sat => Verification::Failure(self.model()?),
             Response::Unsat => Verification::Success,
             Response::Unknown => Verification::Unknown,
@@ -184,6 +195,39 @@ impl<'a> Solver<'a> {
         let cmd = self.smt.list(match self.dialect {
             Dialect::SMTLIB2 => vec![self.smt.atoms().check_sat],
             Dialect::Z3 => vec![self.smt.atom("check-sat-using"), self.smt.atom("default")],
+        });
+
+        self.smt.raw_send(cmd)?;
+
+        // Parse response.
+        let resp = self.smt.raw_recv()?;
+        let atoms = self.smt.atoms();
+        if resp == atoms.sat {
+            Ok(Response::Sat)
+        } else if resp == atoms.unsat {
+            Ok(Response::Unsat)
+        } else if resp == atoms.unknown {
+            Ok(Response::Unknown)
+        } else {
+            bail!("bad solver check response: {}", self.smt.display(resp))
+        }
+    }
+
+    fn check_with_tactics(&mut self) -> Result<Response> {
+        // Use a tactic pipeline for Z3 to speed up UNSAT checks.
+        let cmd = self.smt.list(match self.dialect {
+            Dialect::SMTLIB2 => vec![self.smt.atoms().check_sat],
+            Dialect::Z3 => vec![
+                self.smt.atom("check-sat-using"),
+                self.smt.list(vec![
+                    self.smt.atom("then"),
+                    self.smt.atom("simplify"),
+                    self.smt.atom("propagate-values"),
+                    self.smt.atom("solve-eqs"),
+                    self.smt.atom("bit-blast"),
+                    self.smt.atom("sat"),
+                ]),
+            ],
         });
 
         self.smt.raw_send(cmd)?;
