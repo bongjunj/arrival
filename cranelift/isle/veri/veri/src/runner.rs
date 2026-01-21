@@ -769,10 +769,33 @@ impl Runner {
 
         // Applicability check.
         let start = time::Instant::now();
-        let applicability = solver.check_assumptions_feasibility()?;
+        // Enumerate multiple applicability models by blocking the first `Type` struct's fields.
+        // This helps debug polymorphic rules (e.g., scalar vs vector modes) without changing ISLE.
+        const MAX_APPLICABILITY_MODELS: usize = 8;
+        let block_on = conditions
+            .first_type_struct_field_expr_ids()
+            .map(|xs| xs.to_vec())
+            .unwrap_or_default();
+        let (applicability, applicability_models) = solver
+            .check_assumptions_feasibility_with_models(&block_on, MAX_APPLICABILITY_MODELS)?;
         let applicable_time = start.elapsed();
 
         writeln!(output, "\t\tapplicability = {applicability}")?;
+        if matches!(applicability, Applicability::Applicable) && !applicability_models.is_empty() {
+            if let Some(first) = applicability_models.first() {
+                if let Some(summary) = conditions.first_type_struct_summary(first)? {
+                    writeln!(output, "\t\ttype_model[0] = {summary}")?;
+                }
+            }
+            if applicability_models.len() > 1 {
+                writeln!(output, "\t\ttype_model_count = {}", applicability_models.len())?;
+                for (i, model) in applicability_models.iter().enumerate().skip(1) {
+                    if let Some(summary) = conditions.first_type_struct_summary(model)? {
+                        writeln!(output, "\t\ttype_model[{i}] = {summary}")?;
+                    }
+                }
+            }
+        }
         match applicability {
             Applicability::Applicable => (),
             Applicability::Inapplicable => {

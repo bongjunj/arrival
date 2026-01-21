@@ -166,6 +166,81 @@ impl<'a> Solver<'a> {
         Ok(verdict)
     }
 
+    /// Like [`check_assumptions_feasibility`], but (optionally) enumerates multiple
+    /// distinct SAT models by blocking previous assignments to the given expressions.
+    ///
+    /// This is primarily intended for debugging: when `Type` is modeled as a struct,
+    /// we can enumerate multiple assignments to its fields to see which polymorphic
+    /// configuration(s) the solver can satisfy.
+    ///
+    /// Returns:
+    /// - the overall applicability verdict for the assumptions (ignoring any added blocking),
+    /// - and any SAT models found (at most `max_models`).
+    pub fn check_assumptions_feasibility_with_models(
+        &mut self,
+        block_on: &[ExprId],
+        max_models: usize,
+    ) -> Result<(Applicability, Vec<Model>)> {
+        // Enter solver context frame.
+        self.smt.push()?;
+
+        // Assumptions
+        let assumptions = self.all(&self.conditions.assumptions);
+        self.smt.assert(assumptions)?;
+
+        let mut models: Vec<Model> = Vec::new();
+        let mut overall: Option<Applicability> = None;
+
+        for _ in 0..max_models.max(1) {
+            match self.check()? {
+                Response::Sat => {
+                    overall.get_or_insert(Applicability::Applicable);
+                    let model = self.model()?;
+                    models.push(model);
+
+                    // If we aren't asked to enumerate, stop after the first model.
+                    if block_on.is_empty() || models.len() >= max_models {
+                        break;
+                    }
+
+                    // Block the last model's assignment on the requested expressions.
+                    let last = models.last().expect("just pushed");
+                    let mut disj: Vec<SExpr> = Vec::new();
+                    for x in block_on {
+                        let c = last.get(x).ok_or_else(|| {
+                            format_err!("blocking expr {x} is undefined in model", x = x.index())
+                        })?;
+                        let neq = self.smt.not(self.smt.eq(self.expr_atom(*x), self.constant(c)));
+                        disj.push(neq);
+                    }
+
+                    // Build (or disj...) without requiring or_many.
+                    let mut it = disj.into_iter();
+                    let Some(mut block) = it.next() else {
+                        break;
+                    };
+                    for d in it {
+                        block = self.smt.or(block, d);
+                    }
+                    self.smt.assert(block)?;
+                }
+                Response::Unsat => {
+                    overall.get_or_insert(Applicability::Inapplicable);
+                    break;
+                }
+                Response::Unknown => {
+                    overall.get_or_insert(Applicability::Unknown);
+                    break;
+                }
+            }
+        }
+
+        // Leave solver context frame.
+        self.smt.pop()?;
+
+        Ok((overall.unwrap_or(Applicability::Unknown), models))
+    }
+
     pub fn check_verification_condition(&mut self) -> Result<Verification> {
         // Enter solver context frame.
         self.smt.push()?;

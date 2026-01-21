@@ -910,6 +910,58 @@ impl Conditions {
         Ok(())
     }
 
+    /// If any term call uses a `Type` modeled as a struct with fields
+    /// `{kind,bits,lane_bits,lanes}`, return the first such `Type` value
+    /// formatted under the given model.
+    ///
+    /// This is useful for debugging polymorphic `Type`-dependent semantics:
+    /// it shows which concrete `Type` assignment the SMT solver picked.
+    pub fn first_type_struct_summary(&self, model: &Model) -> Result<Option<String>> {
+        let Some(sym) = self.first_type_struct_symbolic() else {
+            return Ok(None);
+        };
+        Ok(Some(sym.eval(model)?.to_string()))
+    }
+
+    /// Return the ExprIds corresponding to the first `Type`-shaped struct's fields,
+    /// in canonical order: `kind, bits, lane_bits, lanes`.
+    ///
+    /// These ExprIds can be used to enumerate multiple applicability models by
+    /// blocking previously-seen field assignments.
+    pub fn first_type_struct_field_expr_ids(&self) -> Option<[ExprId; 4]> {
+        let sym = self.first_type_struct_symbolic()?;
+        let fields = sym.as_struct()?;
+
+        fn field_scalar(fields: &[SymbolicField], name: &str) -> Option<ExprId> {
+            fields
+                .iter()
+                .find(|f| f.name == name)
+                .and_then(|f| f.value.as_scalar())
+        }
+
+        Some([
+            field_scalar(fields, "kind")?,
+            field_scalar(fields, "bits")?,
+            field_scalar(fields, "lane_bits")?,
+            field_scalar(fields, "lanes")?,
+        ])
+    }
+
+    fn first_type_struct_symbolic(&self) -> Option<&Symbolic> {
+        // Prefer arguments of calls; these correspond closely to term specs.
+        for call in &self.calls {
+            for arg in &call.args {
+                if is_type_struct_symbolic(arg) {
+                    return Some(arg);
+                }
+            }
+            if is_type_struct_symbolic(&call.ret) {
+                return Some(&call.ret);
+            }
+        }
+        None
+    }
+
     pub fn error_at_expr(&self, prog: &Program, x: ExprId, msg: impl Into<String>) -> Error {
         if let Some(pos) = self.pos.get(&x) {
             prog.error_at_pos(*pos, msg).into()
@@ -917,6 +969,27 @@ impl Conditions {
             Error::msg(msg.into())
         }
     }
+}
+
+fn is_type_struct_symbolic(sym: &Symbolic) -> bool {
+    let Some(fields) = sym.as_struct() else {
+        return false;
+    };
+    // Require all canonical fields.
+    let mut has_kind = false;
+    let mut has_bits = false;
+    let mut has_lane_bits = false;
+    let mut has_lanes = false;
+    for f in fields {
+        match f.name.as_str() {
+            "kind" => has_kind = true,
+            "bits" => has_bits = true,
+            "lane_bits" => has_lane_bits = true,
+            "lanes" => has_lanes = true,
+            _ => {}
+        }
+    }
+    has_kind && has_bits && has_lane_bits && has_lanes
 }
 
 enum TermKind {
