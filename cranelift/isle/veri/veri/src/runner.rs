@@ -771,10 +771,9 @@ impl Runner {
         let start = time::Instant::now();
         // Enumerate multiple applicability models by blocking the first `Type` struct's fields.
         // This helps debug polymorphic rules (e.g., scalar vs vector modes) without changing ISLE.
-        const MAX_APPLICABILITY_MODELS: usize = 8;
+        const MAX_APPLICABILITY_MODELS: usize = 32;
         let block_on = conditions
             .first_type_struct_field_expr_ids()
-            .map(|xs| xs.to_vec())
             .unwrap_or_default();
         let (applicability, applicability_models) = solver
             .check_assumptions_feasibility_with_models(&block_on, MAX_APPLICABILITY_MODELS)?;
@@ -788,7 +787,11 @@ impl Runner {
                 }
             }
             if applicability_models.len() > 1 {
-                writeln!(output, "\t\ttype_model_count = {}", applicability_models.len())?;
+                writeln!(
+                    output,
+                    "\t\ttype_model_count = {}",
+                    applicability_models.len()
+                )?;
                 for (i, model) in applicability_models.iter().enumerate().skip(1) {
                     if let Some(summary) = conditions.first_type_struct_summary(model)? {
                         writeln!(output, "\t\ttype_model[{i}] = {summary}")?;

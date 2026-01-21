@@ -210,7 +210,9 @@ impl<'a> Solver<'a> {
                         let c = last.get(x).ok_or_else(|| {
                             format_err!("blocking expr {x} is undefined in model", x = x.index())
                         })?;
-                        let neq = self.smt.not(self.smt.eq(self.expr_atom(*x), self.constant(c)));
+                        let neq = self
+                            .smt
+                            .not(self.smt.eq(self.expr_atom(*x), self.constant(c)));
                         disj.push(neq);
                     }
 

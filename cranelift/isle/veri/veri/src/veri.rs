@@ -910,6 +910,8 @@ impl Conditions {
         Ok(())
     }
 
+    /// HACK: should not embed how `Type` is defined in ISLE specification,
+    /// and this engine must be agnostic to definitions in ISLE.
     /// If any term call uses a `Type` modeled as a struct with fields
     /// `{kind,bits,lane_bits,lanes}`, return the first such `Type` value
     /// formatted under the given model.
@@ -924,11 +926,13 @@ impl Conditions {
     }
 
     /// Return the ExprIds corresponding to the first `Type`-shaped struct's fields,
-    /// in canonical order: `kind, bits, lane_bits, lanes`.
+    /// in canonical order:
+    /// - always: `kind, lane_bits, lanes`
+    /// - optionally: `bits` (if present in the struct)
     ///
     /// These ExprIds can be used to enumerate multiple applicability models by
     /// blocking previously-seen field assignments.
-    pub fn first_type_struct_field_expr_ids(&self) -> Option<[ExprId; 4]> {
+    pub fn first_type_struct_field_expr_ids(&self) -> Option<Vec<ExprId>> {
         let sym = self.first_type_struct_symbolic()?;
         let fields = sym.as_struct()?;
 
@@ -939,12 +943,14 @@ impl Conditions {
                 .and_then(|f| f.value.as_scalar())
         }
 
-        Some([
-            field_scalar(fields, "kind")?,
-            field_scalar(fields, "bits")?,
-            field_scalar(fields, "lane_bits")?,
-            field_scalar(fields, "lanes")?,
-        ])
+        let mut xs = Vec::new();
+        xs.push(field_scalar(fields, "kind")?);
+        if let Some(bits) = field_scalar(fields, "bits") {
+            xs.push(bits);
+        }
+        xs.push(field_scalar(fields, "lane_bits")?);
+        xs.push(field_scalar(fields, "lanes")?);
+        Some(xs)
     }
 
     fn first_type_struct_symbolic(&self) -> Option<&Symbolic> {
@@ -977,19 +983,17 @@ fn is_type_struct_symbolic(sym: &Symbolic) -> bool {
     };
     // Require all canonical fields.
     let mut has_kind = false;
-    let mut has_bits = false;
     let mut has_lane_bits = false;
     let mut has_lanes = false;
     for f in fields {
         match f.name.as_str() {
             "kind" => has_kind = true,
-            "bits" => has_bits = true,
             "lane_bits" => has_lane_bits = true,
             "lanes" => has_lanes = true,
             _ => {}
         }
     }
-    has_kind && has_bits && has_lane_bits && has_lanes
+    has_kind && has_lane_bits && has_lanes
 }
 
 enum TermKind {
@@ -1892,9 +1896,7 @@ impl<'a> ConditionsBuilder<'a> {
                 _ => bail!("boolean value must be zero or one"),
             })),
             Type::Int => Ok(self.constant(Const::Int(val))),
-            Type::BitVector(Width::Bits(w)) => {
-                Ok(self.constant(Const::bv_from_signed(val, *w)?))
-            }
+            Type::BitVector(Width::Bits(w)) => Ok(self.constant(Const::bv_from_signed(val, *w)?)),
             _ => bail!("cannot construct constant of type {ty}"),
         }
     }
