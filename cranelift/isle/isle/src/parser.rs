@@ -1219,13 +1219,13 @@ impl<'a> Parser<'a> {
         let end_pos = self.pos();
         assert_eq!(start_pos.file, end_pos.file);
         let map = self.files.file_line_map(start_pos.file).unwrap();
-        let file_name = self.files.file_name(start_pos.file).unwrap();
+        let _file_name = self.files.file_name(start_pos.file).unwrap();
         let start_line = map.line(start_pos.offset);
         let end_line = map.line(end_pos.offset);
-        let lines = (end_line - start_line) + 1;
+        let _lines = (end_line - start_line) + 1;
 
         // Categorize the definition.
-        let category = match def {
+        let _category = match def {
             // Spec
             Def::Attr(_) => "attr",
             Def::Spec(spec) => &format!("spec/{}", spec.term.0),
@@ -1253,6 +1253,6 @@ impl<'a> Parser<'a> {
         };
 
         // Report
-        log!(target: "isle_spec_lines", "SPEC_LINES\t{lines}\t{category}\t{file_name}\t{start_line}");
+        log!(target: "isle_spec_lines", "SPEC_LINES\t{_lines}\t{_category}\t{_file_name}\t{start_line}");
     }
 }

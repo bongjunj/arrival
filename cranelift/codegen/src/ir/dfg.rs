@@ -330,7 +330,7 @@ impl DataFlowGraph {
     }
 
     /// Get an iterator over all values.
-    pub fn values<'a>(&'a self) -> Values {
+    pub fn values<'a>(&'a self) -> Values<'a> {
         Values {
             inner: self.values.iter(),
         }
@@ -974,7 +974,7 @@ impl DataFlowGraph {
     }
 
     /// Create a `ReplaceBuilder` that will replace `inst` with a new instruction in place.
-    pub fn replace(&mut self, inst: Inst) -> ReplaceBuilder {
+    pub fn replace(&mut self, inst: Inst) -> ReplaceBuilder<'_> {
         ReplaceBuilder::new(self, inst)
     }
 
