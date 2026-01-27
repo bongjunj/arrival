@@ -23,6 +23,74 @@ use std::io::Read;
 use std::process;
 use std::time::Instant;
 
+fn maybe_allow_mismatched_lifetime_syntaxes_in_generated_rs(
+    out_dir: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error + 'static>> {
+    // These warnings are emitted by Rust (not Clippy) for some generated code in Cranelift.
+    // We patch the generated Rust files in OUT_DIR to keep downstream builds quiet without
+    // globally suppressing warnings.
+    //
+    // This specifically targets:
+    // - `#[warn(mismatched_lifetime_syntaxes)]`
+    //
+    // Note: these files are often `include!()`'d inside an `impl`/item context, where inner
+    // attributes (`#![...]`) are not permitted. So we use outer attributes (`#[...]`) on the
+    // relevant items instead.
+
+    for entry in std::fs::read_dir(out_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+            continue;
+        }
+        // Keep this file as-is (it is tiny and not the source of the warning).
+        if path.file_name().and_then(|n| n.to_str()) == Some("version.rs") {
+            continue;
+        }
+
+        let src = std::fs::read_to_string(&path)?;
+
+        // If a previous version of this patch inserted an inner attribute, remove it.
+        let src = src.replace("#![allow(mismatched_lifetime_syntaxes)]\n\n", "");
+        let src = src.replace("#![allow(mismatched_lifetime_syntaxes)]\n", "");
+
+        let mut out = String::with_capacity(src.len() + 256);
+        let mut prev_nonempty_was_allow = false;
+
+        for line in src.lines() {
+            let trimmed = line.trim_start();
+            let indent = &line[..line.len() - trimmed.len()];
+
+            let is_fn_line = trimmed.starts_with("fn ")
+                || trimmed.starts_with("pub fn ")
+                || trimmed.starts_with("pub(crate) fn ")
+                || trimmed.starts_with("pub(super) fn ")
+                || trimmed.starts_with("pub(in ") && trimmed.contains(") fn ");
+
+            if is_fn_line && !prev_nonempty_was_allow {
+                out.push_str(indent);
+                out.push_str("#[allow(mismatched_lifetime_syntaxes)]\n");
+            }
+
+            out.push_str(line);
+            out.push('\n');
+
+            if trimmed.is_empty() {
+                // keep prev_nonempty_was_allow
+            } else {
+                prev_nonempty_was_allow = trimmed == "#[allow(mismatched_lifetime_syntaxes)]";
+            }
+        }
+
+        // Only write if something changed.
+        if out != src {
+            std::fs::write(&path, out)?;
+        }
+    }
+
+    Ok(())
+}
+
 fn main() {
     let start_time = Instant::now();
 
@@ -88,6 +156,11 @@ fn main() {
 
     if let Err(err) = meta::generate(&isas, &out_dir, isle_dir) {
         eprintln!("Error: {err}");
+        process::exit(1);
+    }
+
+    if let Err(err) = maybe_allow_mismatched_lifetime_syntaxes_in_generated_rs(&out_dir) {
+        eprintln!("Error post-processing generated Rust code: {err}");
         process::exit(1);
     }
 

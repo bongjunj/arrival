@@ -8,7 +8,7 @@ use std::io::Write;
 /// Printable is a trait satisfied by AST nodes that can be printed.
 pub trait Printable {
     /// Map the node to a pretty document.
-    fn to_doc(&self) -> RcDoc<()>;
+    fn to_doc(&'_ self) -> RcDoc<'_, ()>;
 }
 
 /// Print the given AST node with specified line width.
@@ -29,14 +29,14 @@ pub fn dump<N: Printable>(node: &N) -> Result<(), Errors> {
 }
 
 impl<P: Printable> Printable for Vec<P> {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         let sep = RcDoc::hardline().append(Doc::hardline());
         RcDoc::intersperse(self.iter().map(|d| d.to_doc()), sep).append(Doc::hardline())
     }
 }
 
 impl Printable for Def {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         match self {
             Def::Pragma(_) => unimplemented!("pragmas not supported"),
             Def::Type(ref t) => {
@@ -123,13 +123,13 @@ impl Printable for Def {
 }
 
 impl Printable for Ident {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&self) -> RcDoc<'_, ()> {
         RcDoc::text(self.0.clone())
     }
 }
 
 impl Printable for TypeValue {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&self) -> RcDoc<'_, ()> {
         match self {
             TypeValue::Primitive(ref name, _) => {
                 sexp(vec![RcDoc::text("primitive"), name.to_doc()])
@@ -145,7 +145,7 @@ impl Printable for TypeValue {
 }
 
 impl Printable for Variant {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         sexp(
             // TODO(mbm): convenience for sexp with a fixed first element
             Vec::from([self.name.to_doc()])
@@ -156,13 +156,13 @@ impl Printable for Variant {
 }
 
 impl Printable for Field {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&self) -> RcDoc<'_, ()> {
         sexp(vec![self.name.to_doc(), self.ty.to_doc()])
     }
 }
 
 impl Printable for Attr {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         let mut parts = vec![RcDoc::text("attr")];
         match &self.target {
             AttrTarget::Term(name) => parts.push(name.to_doc()),
@@ -177,7 +177,7 @@ impl Printable for Attr {
 }
 
 impl Printable for AttrKind {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&self) -> RcDoc<'_, ()> {
         match self {
             AttrKind::Chain => sexp(vec![RcDoc::text("veri"), RcDoc::text("chain")]),
             AttrKind::Priority => sexp(vec![RcDoc::text("veri"), RcDoc::text("priority")]),
@@ -187,7 +187,7 @@ impl Printable for AttrKind {
 }
 
 impl Printable for ModelValue {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         match self {
             ModelValue::TypeValue(ref mt) => sexp(vec![RcDoc::text("type"), mt.to_doc()]),
             ModelValue::ConstValue(ref c) => sexp(vec![RcDoc::text("const"), c.to_doc()]),
@@ -196,7 +196,7 @@ impl Printable for ModelValue {
 }
 
 impl Printable for ModelType {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         match self {
             ModelType::Unspecified => RcDoc::text("!"),
             ModelType::Auto => RcDoc::text("_"),
@@ -216,13 +216,13 @@ impl Printable for ModelType {
 }
 
 impl Printable for ModelField {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         sexp(vec![self.name.to_doc(), self.ty.to_doc()])
     }
 }
 
 impl Printable for Signature {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         sexp(vec![
             sexp(
                 Vec::from([RcDoc::text("args")])
@@ -235,7 +235,7 @@ impl Printable for Signature {
 }
 
 impl Printable for SpecExpr {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         match self {
             SpecExpr::ConstInt { val, .. } => RcDoc::as_string(val),
             SpecExpr::ConstBitVec { val, width, .. } => RcDoc::text(if width % 4 == 0 {
@@ -313,7 +313,7 @@ impl Printable for SpecExpr {
 }
 
 impl Printable for SpecOp {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         RcDoc::text(match self {
             SpecOp::Eq => "=",
             SpecOp::And => "and",
@@ -406,7 +406,7 @@ impl Printable for SpecOp {
 }
 
 impl Printable for Arm {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         sexp(vec![
             sexp(
                 Vec::from([self.variant.to_doc()])
@@ -419,13 +419,13 @@ impl Printable for Arm {
 }
 
 impl Printable for FieldInit {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         sexp(vec![self.name.to_doc(), self.value.to_doc()])
     }
 }
 
 impl Printable for SpecMacro {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         let mut parts = vec![RcDoc::text("macro")];
         parts.push(sexp(
             Vec::from([self.name.to_doc()])
@@ -438,7 +438,7 @@ impl Printable for SpecMacro {
 }
 
 impl Printable for Modifies {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         let mut parts = vec![RcDoc::text("modifies"), self.state.to_doc()];
         if let Some(cond) = &self.cond {
             parts.push(cond.to_doc());
@@ -448,7 +448,7 @@ impl Printable for Modifies {
 }
 
 impl Printable for Spec {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         let mut parts = vec![RcDoc::text("spec")];
         parts.push(sexp(
             Vec::from([self.term.to_doc()])
@@ -484,7 +484,7 @@ impl Printable for Spec {
 }
 
 impl Printable for State {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         sexp(vec![
             RcDoc::text("state"),
             self.name.to_doc(),
@@ -495,7 +495,7 @@ impl Printable for State {
 }
 
 impl Printable for Pattern {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         match self {
             Pattern::Var { var, .. } => var.to_doc(),
             Pattern::BindPattern { var, subpat, .. } => RcDoc::intersperse(
@@ -523,7 +523,7 @@ impl Printable for Pattern {
 }
 
 impl Printable for IfLet {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         // TODO(mbm): `if` shorthand when pattern is wildcard
         sexp(vec![
             RcDoc::text("if-let"),
@@ -534,7 +534,7 @@ impl Printable for IfLet {
 }
 
 impl Printable for Expr {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         match self {
             Expr::Term { sym, args, .. } => sexp(
                 // TODO(mbm): convenience for sexp with a fixed first element
@@ -558,13 +558,13 @@ impl Printable for Expr {
 }
 
 impl Printable for LetDef {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         sexp(vec![self.var.to_doc(), self.ty.to_doc(), self.val.to_doc()])
     }
 }
 
 impl Printable for Extern {
-    fn to_doc(&self) -> RcDoc<()> {
+    fn to_doc(&'_ self) -> RcDoc<'_, ()> {
         match self {
             Extern::Extractor {
                 term,
