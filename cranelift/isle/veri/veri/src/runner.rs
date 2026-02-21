@@ -683,7 +683,7 @@ impl Runner {
             match &solution.status {
                 type_inference::Status::Solved => (),
                 type_inference::Status::Inapplicable(conflict) => {
-                    log::debug!(
+                    log::trace!(
                         "{diagnostic}",
                         diagnostic = conflict.diagnostic(&conditions, &self.prog.files)
                     );
