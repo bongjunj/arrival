@@ -514,7 +514,7 @@ impl Runner {
 
         // Process expansions.
         let expansions = expander.expansions();
-        log::info!("expansions: {n}", n = expansions.len());
+        log::debug!("expansions: {n}", n = expansions.len());
 
         let mut expansion_reports = expansions
             .par_iter()
@@ -684,7 +684,7 @@ impl Runner {
                 type_inference::Status::Solved => (),
                 type_inference::Status::Inapplicable(conflict) => {
                     log::debug!(
-                        "inapplicable type inference: {diagnostic}",
+                        "{diagnostic}",
                         diagnostic = conflict.diagnostic(&conditions, &self.prog.files)
                     );
                     report.failed_type_inference += 1;
@@ -756,7 +756,7 @@ impl Runner {
         // Solve.
         let binary = solver_backend.prog();
         let args = solver_backend.args(self.timeout);
-        let replay_file = Self::open_log_file(log_dir, "solver.smt2")?;
+        let replay_file = Self::open_log_file(log_dir.clone(), "solver.smt2")?;
         let smt = easy_smt::ContextBuilder::new()
             .solver(binary, &args)
             .replay_file(Some(replay_file))
@@ -827,8 +827,10 @@ impl Runner {
         writeln!(output, "\t\tverification = {verification}")?;
         Ok(match verification {
             Verification::Failure(model) => {
-                println!("model:");
-                conditions.print_model(&model, &self.prog)?;
+                let model_path = log_dir.join("model.txt");
+                let mut model_file = Self::open_log_file(log_dir.clone(), "model.txt")?;
+                conditions.write_model(&mut model_file, &model, &self.prog)?;
+                writeln!(output, "\t\tmodel_path = {}", model_path.display())?;
                 VerifyReport {
                     verdict: Verdict::Failure,
                     init_time,

@@ -801,7 +801,7 @@ impl SpecEnv {
                 let term_id = match termenv.get_term_by_name(tyenv, &inst.term) {
                     Some(term_id) => term_id,
                     None => {
-                        log::warn!("skipping instantiation for unknown term '{}'", inst.term.0);
+                        log::debug!("skipping instantiation for unknown term '{}'", inst.term.0);
                         continue;
                     }
                 };
@@ -820,7 +820,7 @@ impl SpecEnv {
                 let term_id = match termenv.get_term_by_name(tyenv, &spec.term) {
                     Some(id) => id,
                     None => {
-                        log::warn!("skipping spec for unknown term '{}'", spec.term.0);
+                        log::debug!("skipping spec for unknown term '{}'", spec.term.0);
                         continue;
                     }
                 };
@@ -845,7 +845,7 @@ impl SpecEnv {
                         let term_id = match termenv.get_term_by_name(tyenv, name) {
                             Some(id) => id,
                             None => {
-                                log::warn!("skipping attr for unknown term '{}'", name.0);
+                                log::debug!("skipping attr for unknown term '{}'", name.0);
                                 continue;
                             }
                         };

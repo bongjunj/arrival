@@ -14,6 +14,7 @@ use cranelift_isle::{
 };
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
+    io::Write,
     iter::zip,
 };
 
@@ -879,10 +880,16 @@ impl Conditions {
         reach
     }
 
-    pub fn print_model(&self, model: &Model, prog: &Program) -> Result<()> {
+    pub fn write_model(
+        &self,
+        out: &mut dyn Write,
+        model: &Model,
+        prog: &Program,
+    ) -> Result<()> {
         // State
+        writeln!(out, "model:")?;
         for (name, value) in &self.state.0 {
-            println!("state: {name} = {}", value.eval(model)?);
+            writeln!(out, "state: {name} = {}", value.eval(model)?)?;
         }
 
         // Calls
@@ -894,7 +901,8 @@ impl Conditions {
                 continue;
             }
 
-            println!(
+            writeln!(
+                out,
                 "{term_name}({args}) -> {ret}",
                 term_name = prog.term_name(call.term),
                 args = call
@@ -904,10 +912,15 @@ impl Conditions {
                     .collect::<Result<Vec<_>>>()?
                     .join(", "),
                 ret = call.ret.eval(model)?
-            );
+            )?;
         }
 
         Ok(())
+    }
+
+    pub fn print_model(&self, model: &Model, prog: &Program) -> Result<()> {
+        let mut stderr = std::io::stderr();
+        self.write_model(&mut stderr, model, prog)
     }
 
     /// HACK: should not embed how `Type` is defined in ISLE specification,
