@@ -340,10 +340,9 @@ impl Constraint {
                     ..
                 },
             ) => tb == tc && vb == vc,
-            (
-                Constraint::ConstBool { val: vc, ty: tc },
-                Binding::ConstBool { val: vb, ty: tb },
-            ) => vc == vb && tc == tb,
+            (Constraint::ConstBool { val: vc, ty: tc }, Binding::ConstBool { val: vb, ty: tb }) => {
+                vc == vb && tc == tb
+            }
             (Constraint::ConstInt { val: vc, ty: tc }, Binding::ConstInt { val: vb, ty: tb }) => {
                 vc == vb && tc == tb
             }

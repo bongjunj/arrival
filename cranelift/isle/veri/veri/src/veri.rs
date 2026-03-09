@@ -880,12 +880,7 @@ impl Conditions {
         reach
     }
 
-    pub fn write_model(
-        &self,
-        out: &mut dyn Write,
-        model: &Model,
-        prog: &Program,
-    ) -> Result<()> {
+    pub fn write_model(&self, out: &mut dyn Write, model: &Model, prog: &Program) -> Result<()> {
         // State
         writeln!(out, "model:")?;
         for (name, value) in &self.state.0 {
